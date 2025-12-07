@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import "./App.css";
 
-import "./App.css"
-export default function RustmanUI() {
+export default function PostmanUI() {
   const [method, setMethod] = useState("GET");
   const [url, setUrl] = useState("");
   const [headers, setHeaders] = useState([{ key: "", value: "" }]);
@@ -11,76 +11,68 @@ export default function RustmanUI() {
   const [response, setResponse] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("params");
-  
- 
 
-const sendToBackend = async () => {
-  if (!url.trim()) return alert("Enter URL");
-  setLoading(true);
-  setResponse(null);
+  const sendToBackend = async () => {
+    if (!url.trim()) return alert("Enter URL");
+    setLoading(true);
+    setResponse(null);
 
-  // Build query params
-  const queryString = queryParams
-    .filter(q => q.key.trim())
-    .map(q => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value)}`)
-    .join("&");
+    const queryString = queryParams
+      .filter((q) => q.key.trim())
+      .map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value)}`)
+      .join("&");
 
-  const finalUrl = queryString ? `${url}?${queryString}` : url;
+    const finalUrl = queryString ? `${url}?${queryString}` : url;
 
-  // Parse body if it's valid JSON
-  let finalBody: string | null = null;
-
-  if (body.trim()) {
-    try {
-      finalBody = JSON.stringify(JSON.parse(body)); // normalize JSON
-    } catch {
-      // If invalid JSON, still send raw string
-      finalBody = body;
+    let finalBody: string | null = null;
+    if (body.trim()) {
+      try {
+        finalBody = JSON.stringify(JSON.parse(body));
+      } catch {
+        finalBody = body;
+      }
     }
-  }
 
-  // Auto-json header if method requires a body
-  const autoHeaders =
-    ["POST", "PUT", "PATCH"].includes(method)
-      ? { "Content-Type": "application/json" }
-      : {};
+    const autoHeaders =
+      ["POST", "PUT", "PATCH"].includes(method)
+        ? { "Content-Type": "application/json" }
+        : {};
 
-  const userHeaders = Object.fromEntries(
-    headers
-      .filter(h => h.key.trim())
-      .map(h => [h.key.trim(), h.value])
-  );
+    const userHeaders = Object.fromEntries(
+      headers
+        .filter((h) => h.key.trim())
+        .map((h) => [h.key.trim(), h.value])
+    );
 
-  const payload = {
-    method,
-    url: finalUrl,
-    headers: { ...autoHeaders, ...userHeaders }, // user headers override auto ones
-    body: finalBody,
+    const payload = {
+      method,
+      url: finalUrl,
+      headers: { ...autoHeaders, ...userHeaders },
+      body: finalBody,
+    };
+
+    try {
+      const res = await invoke("send_request", { payload });
+      setResponse(res);
+    } catch (err) {
+      setResponse({ error: String(err) });
+    }
+
+    setLoading(false);
   };
-
-  try {
-    const res = await invoke("send_request", { payload });
-    setResponse(res);
-  } catch (err) {
-    setResponse({ error: String(err) });
-  }
-
-  setLoading(false);
-};
 
   const addRow = (setter: any, rows: any[]) =>
     setter([...rows, { key: "", value: "" }]);
 
   const tabButton = (tab: string) => ({
-    padding: "10px 25px",
-    borderRadius: 14,
-    fontWeight: "600",
+    padding: "10px 20px",
+    borderRadius: 12,
+    border: "1px solid #00ffc855",
+    background: activeTab === tab ? "#00ffc820" : "transparent",
+    color: activeTab === tab ? "#00ffc8" : "#e0e0e0",
     cursor: "pointer",
-    border: "none",
-    background: activeTab === tab ? "#00ffaa" : "rgba(255,255,255,0.12)",
-    color: activeTab === tab ? "#000" : "#fff",
-    boxShadow: activeTab === tab ? "0 0 10px #00ffaa75" : "none",
     transition: "0.3s",
+    fontWeight: "600",
   });
 
   return (
@@ -89,39 +81,37 @@ const sendToBackend = async () => {
         display: "flex",
         width: "100vw",
         height: "100vh",
-        background: "linear-gradient(135deg, #0e0f17, #151726, #0e0f17)",
+        background: "linear-gradient(135deg, #020a13, #050d18, #02131f)",
         padding: 20,
-        boxSizing: "border-box",
         color: "white",
         fontFamily: "'Inter', sans-serif",
         gap: 20,
       }}
     >
-      {/* LEFT SIDE (Request Builder) */}
+      {/* LEFT SIDE */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         {/* Request Bar */}
         <div
           style={{
             display: "flex",
             gap: 15,
-            padding: 20,
-            borderRadius: 16,
-            background: "rgba(255,255,255,0.06)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            boxShadow: "0 8px 20px rgba(0,0,0,0.5)",
+            padding: 18,
+            borderRadius: 14,
+            background: "rgba(0,0,0,0.35)",
+            border: "1px solid #00ffc855",
+            boxShadow: "0 0 20px #00ffc822",
           }}
         >
           <select
             value={method}
             onChange={(e) => setMethod(e.target.value)}
             style={{
-              padding: "12px 20px",
-              background: "rgba(0,0,0,0.35)",
-              color: "white",
+              padding: "12px 15px",
+              background: "rgba(0,0,0,0.4)",
+              color: "#00ffc8",
+              borderRadius: 10,
+              border: "1px solid #00ffc855",
               fontWeight: "600",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.15)",
             }}
           >
             {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
@@ -137,11 +127,10 @@ const sendToBackend = async () => {
             style={{
               flex: 1,
               padding: 12,
-              borderRadius: 12,
-              background: "rgba(0,0,0,0.30)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: "white",
-              fontSize: 15,
+              borderRadius: 10,
+              background: "rgba(0,0,0,0.3)",
+              border: "1px solid #00ffc844",
+              color: "#bfffea",
             }}
           />
 
@@ -149,13 +138,12 @@ const sendToBackend = async () => {
             onClick={sendToBackend}
             style={{
               padding: "12px 30px",
-              background: "#ffb300",
-              color: "#000",
+              background: "#00ffc8",
+              color: "#00100c",
               fontWeight: "700",
-              borderRadius: 14,
-              border: "none",
+              borderRadius: 12,
               cursor: "pointer",
-              transition: "0.3s",
+              boxShadow: "0 0 15px #00ffc899",
             }}
           >
             {loading ? "Sending..." : "Send"}
@@ -163,7 +151,7 @@ const sendToBackend = async () => {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+        <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
           <button style={tabButton("params")} onClick={() => setActiveTab("params")}>
             Params
           </button>
@@ -182,129 +170,124 @@ const sendToBackend = async () => {
             flex: 1,
             overflow: "auto",
             padding: 20,
-            borderRadius: 16,
-            background: "rgba(255,255,255,0.06)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            boxShadow: "0 6px 16px rgba(0,0,0,0.4)",
+            borderRadius: 14,
+            background: "rgba(0,0,0,0.30)",
+            border: "1px solid #00ffc833",
+            boxShadow: "0 0 12px #00ffc822",
           }}
         >
           {/* PARAMS */}
-          {activeTab === "params" && (
-            <>
-              {queryParams.map((p, i) => (
-                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                  <input
-                    placeholder="Key"
-                    value={p.key}
-                    onChange={(e) => {
-                      const arr = [...queryParams];
-                      arr[i].key = e.target.value;
-                      setQueryParams(arr);
-                    }}
-                    style={{
-                      padding: 10,
-                      flex: 1,
-                      background: "rgba(0,0,0,0.25)",
-                      color: "white",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                    }}
-                  />
-                  <input
-                    placeholder="Value"
-                    value={p.value}
-                    onChange={(e) => {
-                      const arr = [...queryParams];
-                      arr[i].value = e.target.value;
-                      setQueryParams(arr);
-                    }}
-                    style={{
-                      padding: 10,
-                      flex: 1,
-                      background: "rgba(0,0,0,0.25)",
-                      color: "white",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                    }}
-                  />
-                </div>
-              ))}
+          {activeTab === "params" &&
+            queryParams.map((p, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                <input
+                  placeholder="Key"
+                  value={p.key}
+                  onChange={(e) => {
+                    const arr = [...queryParams];
+                    arr[i].key = e.target.value;
+                    setQueryParams(arr);
+                  }}
+                  style={{
+                    padding: 10,
+                    flex: 1,
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid #00ffc844",
+                    color: "#cafff5",
+                    borderRadius: 10,
+                  }}
+                />
+                <input
+                  placeholder="Value"
+                  value={p.value}
+                  onChange={(e) => {
+                    const arr = [...queryParams];
+                    arr[i].value = e.target.value;
+                    setQueryParams(arr);
+                  }}
+                  style={{
+                    padding: 10,
+                    flex: 1,
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid #00ffc844",
+                    color: "#cafff5",
+                    borderRadius: 10,
+                  }}
+                />
+              </div>
+            ))}
 
-              <button
-                onClick={() => addRow(setQueryParams, queryParams)}
-                style={{
-                  padding: "8px 18px",
-                  background: "rgba(0,255,170,0.1)",
-                  borderRadius: 12,
-                  color: "#00ffaa",
-                  border: "1px solid #00ffaa50",
-                  cursor: "pointer",
-                  fontWeight: "600",
-                }}
-              >
-                + Add Query
-              </button>
-            </>
+          {activeTab === "params" && (
+            <button
+              onClick={() => addRow(setQueryParams, queryParams)}
+              style={{
+                padding: "8px 18px",
+                borderRadius: 10,
+                color: "#00ffc8",
+                background: "rgba(0,255,200,0.12)",
+                border: "1px solid #00ffc855",
+                fontWeight: "600",
+              }}
+            >
+              + Add Query
+            </button>
           )}
 
           {/* HEADERS */}
-          {activeTab === "headers" && (
-            <>
-              {headers.map((h, i) => (
-                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                  <input
-                    placeholder="Header Key"
-                    value={h.key}
-                    onChange={(e) => {
-                      const arr = [...headers];
-                      arr[i].key = e.target.value;
-                      setHeaders(arr);
-                    }}
-                    style={{
-                      padding: 10,
-                      flex: 1,
-                      background: "rgba(0,0,0,0.25)",
-                      color: "white",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                    }}
-                  />
-                  <input
-                    placeholder="Header Value"
-                    value={h.value}
-                    onChange={(e) => {
-                      const arr = [...headers];
-                      arr[i].value = e.target.value;
-                      setHeaders(arr);
-                    }}
-                    style={{
-                      padding: 10,
-                      flex: 1,
-                      background: "rgba(0,0,0,0.25)",
-                      color: "white",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                    }}
-                  />
-                </div>
-              ))}
+          {activeTab === "headers" &&
+            headers.map((h, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                <input
+                  placeholder="Header Key"
+                  value={h.key}
+                  onChange={(e) => {
+                    const arr = [...headers];
+                    arr[i].key = e.target.value;
+                    setHeaders(arr);
+                  }}
+                  style={{
+                    padding: 10,
+                    flex: 1,
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid #00ffc855",
+                    color: "#cafff5",
+                    borderRadius: 10,
+                  }}
+                />
+                <input
+                  placeholder="Header Value"
+                  value={h.value}
+                  onChange={(e) => {
+                    const arr = [...headers];
+                    arr[i].value = e.target.value;
+                    setHeaders(arr);
+                  }}
+                  style={{
+                    padding: 10,
+                    flex: 1,
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid #00ffc855",
+                    color: "#cafff5",
+                    borderRadius: 10,
+                  }}
+                />
+              </div>
+            ))}
 
-              <button
-                onClick={() => addRow(setHeaders, headers)}
-                style={{
-                  padding: "8px 18px",
-                  background: "rgba(0,255,170,0.1)",
-                  borderRadius: 12,
-                  color: "#00ffaa",
-                  border: "1px solid #00ffaa50",
-                  cursor: "pointer",
-                  fontWeight: "600",
-                }}
-              >
-                + Add Header
-              </button>
-            </>
+          {activeTab === "headers" && (
+            <button
+              onClick={() => addRow(setHeaders, headers)}
+              style={{
+                padding: "8px 18px",
+                borderRadius: 10,
+                color: "#00ffc8",
+                background: "rgba(0,255,200,0.12)",
+                border: "1px solid #00ffc855",
+                fontWeight: "600",
+              }}
+            >
+              + Add Header
+            </button>
           )}
 
           {/* BODY */}
@@ -313,38 +296,36 @@ const sendToBackend = async () => {
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={10}
-              placeholder='{"name": "Manoj"}'
+             
               style={{
-                width: "100%",
+                width: "90%",
                 padding: 16,
                 borderRadius: 12,
                 background: "rgba(0,0,0,0.25)",
-                color: "white",
+                border: "1px solid #00ffc855",
+                color: "#cafff5",
                 fontFamily: "monospace",
-                border: "1px solid rgba(255,255,255,0.12)",
               }}
             />
           )}
         </div>
       </div>
 
-      {/* RIGHT SIDE (Response Viewer) */}
+      {/* RESPONSE */}
       <div
         style={{
           width: "40%",
           padding: 20,
-          borderRadius: 16,
-          background: "rgba(255,255,255,0.06)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          boxShadow: "0 8px 20px rgba(0,0,0,0.5)",
-          whiteSpace: "pre-wrap",
+          borderRadius: 14,
+          background: "rgba(0,0,0,0.35)",
+          border: "1px solid #00ffc822",
+          boxShadow: "0 0 20px #00ffc822",
+          color: "#bfffea",
           overflow: "auto",
           fontFamily: "monospace",
         }}
       >
-        <h2 style={{ marginBottom: 15 }}>Response</h2>
-
+        <h2 style={{ marginBottom: 15, color: "#00ffc8" }}>Response</h2>
         {loading
           ? "⏳ Loading..."
           : response

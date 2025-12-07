@@ -1,9 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import RustmanUI from "./App"; // assuming your main component is RustmanUI
+import PostmanUI from "./App"
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <RustmanUI />
+    <PostmanUI/>
   </React.StrictMode>
 );
