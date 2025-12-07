@@ -11,7 +11,7 @@ use std::collections::HashMap;
 async fn send_request(payload: RequestPayload) -> Result<ResponsePayload, String> {
     let client = reqwest::Client::new();
 
-    // Explicitly specify the type for parse
+    
     let method = payload.method.parse::<reqwest::Method>().map_err(|e| e.to_string())?;
 
     let mut request = client.request(method, &payload.url);

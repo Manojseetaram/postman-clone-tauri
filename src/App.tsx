@@ -88,9 +88,9 @@ export default function PostmanUI() {
         gap: 20,
       }}
     >
-      {/* LEFT SIDE */}
+     
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {/* Request Bar */}
+      
         <div
           style={{
             display: "flex",
@@ -163,7 +163,7 @@ export default function PostmanUI() {
           </button>
         </div>
 
-        {/* Tab Content */}
+       
         <div
           style={{
             marginTop: 20,
@@ -176,7 +176,7 @@ export default function PostmanUI() {
             boxShadow: "0 0 12px #00ffc822",
           }}
         >
-          {/* PARAMS */}
+         
           {activeTab === "params" &&
             queryParams.map((p, i) => (
               <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
@@ -233,7 +233,7 @@ export default function PostmanUI() {
             </button>
           )}
 
-          {/* HEADERS */}
+        
           {activeTab === "headers" &&
             headers.map((h, i) => (
               <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
@@ -290,7 +290,7 @@ export default function PostmanUI() {
             </button>
           )}
 
-          {/* BODY */}
+          
           {activeTab === "body" && (
             <textarea
               value={body}
@@ -311,7 +311,7 @@ export default function PostmanUI() {
         </div>
       </div>
 
-      {/* RESPONSE */}
+ 
       <div
         style={{
           width: "40%",
