@@ -19,11 +19,43 @@ const sendToBackend = async () => {
   setLoading(true);
   setResponse(null);
 
+  // Build query params
+  const queryString = queryParams
+    .filter(q => q.key.trim())
+    .map(q => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value)}`)
+    .join("&");
+
+  const finalUrl = queryString ? `${url}?${queryString}` : url;
+
+  // Parse body if it's valid JSON
+  let finalBody: string | null = null;
+
+  if (body.trim()) {
+    try {
+      finalBody = JSON.stringify(JSON.parse(body)); // normalize JSON
+    } catch {
+      // If invalid JSON, still send raw string
+      finalBody = body;
+    }
+  }
+
+  // Auto-json header if method requires a body
+  const autoHeaders =
+    ["POST", "PUT", "PATCH"].includes(method)
+      ? { "Content-Type": "application/json" }
+      : {};
+
+  const userHeaders = Object.fromEntries(
+    headers
+      .filter(h => h.key.trim())
+      .map(h => [h.key.trim(), h.value])
+  );
+
   const payload = {
     method,
-    url,
-    headers: Object.fromEntries(headers.filter((h) => h.key.trim()).map((h) => [h.key, h.value])),
-    body: body.trim() ? body : null,
+    url: finalUrl,
+    headers: { ...autoHeaders, ...userHeaders }, // user headers override auto ones
+    body: finalBody,
   };
 
   try {
