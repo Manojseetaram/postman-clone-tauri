@@ -25,6 +25,7 @@ export default function PostmanUI() {
     const finalUrl = queryString ? `${url}?${queryString}` : url;
 
     let finalBody: string | null = null;
+
     if (body.trim()) {
       try {
         finalBody = JSON.stringify(JSON.parse(body));
@@ -39,9 +40,7 @@ export default function PostmanUI() {
         : {};
 
     const userHeaders = Object.fromEntries(
-      headers
-        .filter((h) => h.key.trim())
-        .map((h) => [h.key.trim(), h.value])
+      headers.filter((h) => h.key.trim()).map((h) => [h.key.trim(), h.value])
     );
 
     const payload = {
@@ -65,14 +64,16 @@ export default function PostmanUI() {
     setter([...rows, { key: "", value: "" }]);
 
   const tabButton = (tab: string) => ({
-    padding: "10px 20px",
-    borderRadius: 12,
-    border: "1px solid #00ffc855",
-    background: activeTab === tab ? "#00ffc820" : "transparent",
-    color: activeTab === tab ? "#00ffc8" : "#e0e0e0",
+    padding: "10px 22px",
+    borderRadius: 14,
+    fontWeight: 600,
     cursor: "pointer",
-    transition: "0.3s",
-    fontWeight: "600",
+    border: "none",
+    background: activeTab === tab ? "#8b5cf6" : "rgba(255,255,255,0.12)",
+    color: activeTab === tab ? "#fff" : "#d1d1d1",
+    boxShadow:
+      activeTab === tab ? "0 0 12px rgba(139,92,246,0.6)" : "none",
+    transition: "0.25s",
   });
 
   return (
@@ -81,37 +82,41 @@ export default function PostmanUI() {
         display: "flex",
         width: "100vw",
         height: "100vh",
-        background: "linear-gradient(135deg, #020a13, #050d18, #02131f)",
-        padding: 20,
+        background:
+          "linear-gradient(135deg, #0a0a12, #121428, #1a1035, #120f23)",
+        padding: 30,
+        boxSizing: "border-box",
         color: "white",
         fontFamily: "'Inter', sans-serif",
         gap: 20,
+        paddingTop: 40,
       }}
     >
-     
+      {/* LEFT SIDE */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-      
+        {/* Request Bar */}
         <div
           style={{
             display: "flex",
             gap: 15,
-            padding: 18,
-            borderRadius: 14,
-            background: "rgba(0,0,0,0.35)",
-            border: "1px solid #00ffc855",
-            boxShadow: "0 0 20px #00ffc822",
+            padding: 22,
+            borderRadius: 18,
+            background: "rgba(255,255,255,0.07)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
           }}
         >
           <select
             value={method}
             onChange={(e) => setMethod(e.target.value)}
             style={{
-              padding: "12px 15px",
-              background: "rgba(0,0,0,0.4)",
-              color: "#00ffc8",
-              borderRadius: 10,
-              border: "1px solid #00ffc855",
-              fontWeight: "600",
+              padding: "12px 20px",
+              background: "#1c1c2b",
+              color: "white",
+              fontWeight: 600,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.15)",
             }}
           >
             {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
@@ -127,10 +132,11 @@ export default function PostmanUI() {
             style={{
               flex: 1,
               padding: 12,
-              borderRadius: 10,
-              background: "rgba(0,0,0,0.3)",
-              border: "1px solid #00ffc844",
-              color: "#bfffea",
+              borderRadius: 12,
+              background: "#1c1c2b",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "white",
+              fontSize: 15,
             }}
           />
 
@@ -138,12 +144,13 @@ export default function PostmanUI() {
             onClick={sendToBackend}
             style={{
               padding: "12px 30px",
-              background: "#00ffc8",
-              color: "#00100c",
-              fontWeight: "700",
-              borderRadius: 12,
+              background: "#ffb300",
+              color: "#000",
+              fontWeight: 700,
+              borderRadius: 14,
+              border: "none",
               cursor: "pointer",
-              boxShadow: "0 0 15px #00ffc899",
+              transition: "0.3s",
             }}
           >
             {loading ? "Sending..." : "Send"}
@@ -151,7 +158,7 @@ export default function PostmanUI() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button style={tabButton("params")} onClick={() => setActiveTab("params")}>
             Params
           </button>
@@ -163,171 +170,177 @@ export default function PostmanUI() {
           </button>
         </div>
 
-       
+        {/* Tab Content */}
         <div
           style={{
             marginTop: 20,
             flex: 1,
-            overflow: "auto",
-            padding: 20,
-            borderRadius: 14,
-            background: "rgba(0,0,0,0.30)",
-            border: "1px solid #00ffc833",
-            boxShadow: "0 0 12px #00ffc822",
+            overflowY: "auto",
+            padding: 22,
+            borderRadius: 18,
+            background: "rgba(255,255,255,0.07)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            boxShadow: "0 8px 22px rgba(0,0,0,0.45)",
           }}
         >
-         
-          {activeTab === "params" &&
-            queryParams.map((p, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                <input
-                  placeholder="Key"
-                  value={p.key}
-                  onChange={(e) => {
-                    const arr = [...queryParams];
-                    arr[i].key = e.target.value;
-                    setQueryParams(arr);
-                  }}
-                  style={{
-                    padding: 10,
-                    flex: 1,
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid #00ffc844",
-                    color: "#cafff5",
-                    borderRadius: 10,
-                  }}
-                />
-                <input
-                  placeholder="Value"
-                  value={p.value}
-                  onChange={(e) => {
-                    const arr = [...queryParams];
-                    arr[i].value = e.target.value;
-                    setQueryParams(arr);
-                  }}
-                  style={{
-                    padding: 10,
-                    flex: 1,
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid #00ffc844",
-                    color: "#cafff5",
-                    borderRadius: 10,
-                  }}
-                />
-              </div>
-            ))}
-
+          {/* PARAMS */}
           {activeTab === "params" && (
-            <button
-              onClick={() => addRow(setQueryParams, queryParams)}
-              style={{
-                padding: "8px 18px",
-                borderRadius: 10,
-                color: "#00ffc8",
-                background: "rgba(0,255,200,0.12)",
-                border: "1px solid #00ffc855",
-                fontWeight: "600",
-              }}
-            >
-              + Add Query
-            </button>
+            <>
+              {queryParams.map((p, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  <input
+                    placeholder="Key"
+                    value={p.key}
+                    onChange={(e) => {
+                      const arr = [...queryParams];
+                      arr[i].key = e.target.value;
+                      setQueryParams(arr);
+                    }}
+                    style={{
+                      padding: 10,
+                      flex: 1,
+                      background: "#1c1c2b",
+                      color: "white",
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                    }}
+                  />
+                  <input
+                    placeholder="Value"
+                    value={p.value}
+                    onChange={(e) => {
+                      const arr = [...queryParams];
+                      arr[i].value = e.target.value;
+                      setQueryParams(arr);
+                    }}
+                    style={{
+                      padding: 10,
+                      flex: 1,
+                      background: "#1c1c2b",
+                      color: "white",
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                    }}
+                  />
+                </div>
+              ))}
+              <button
+                onClick={() => addRow(setQueryParams, queryParams)}
+                style={{
+                  padding: "8px 18px",
+                  background: "rgba(139,92,246,0.15)",
+                  borderRadius: 12,
+                  color: "#b794f4",
+                  border: "1px solid rgba(139,92,246,0.3)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                + Add Query
+              </button>
+            </>
           )}
 
-        
-          {activeTab === "headers" &&
-            headers.map((h, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                <input
-                  placeholder="Header Key"
-                  value={h.key}
-                  onChange={(e) => {
-                    const arr = [...headers];
-                    arr[i].key = e.target.value;
-                    setHeaders(arr);
-                  }}
-                  style={{
-                    padding: 10,
-                    flex: 1,
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid #00ffc855",
-                    color: "#cafff5",
-                    borderRadius: 10,
-                  }}
-                />
-                <input
-                  placeholder="Header Value"
-                  value={h.value}
-                  onChange={(e) => {
-                    const arr = [...headers];
-                    arr[i].value = e.target.value;
-                    setHeaders(arr);
-                  }}
-                  style={{
-                    padding: 10,
-                    flex: 1,
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid #00ffc855",
-                    color: "#cafff5",
-                    borderRadius: 10,
-                  }}
-                />
-              </div>
-            ))}
-
+          {/* HEADERS */}
           {activeTab === "headers" && (
-            <button
-              onClick={() => addRow(setHeaders, headers)}
-              style={{
-                padding: "8px 18px",
-                borderRadius: 10,
-                color: "#00ffc8",
-                background: "rgba(0,255,200,0.12)",
-                border: "1px solid #00ffc855",
-                fontWeight: "600",
-              }}
-            >
-              + Add Header
-            </button>
+            <>
+              {headers.map((h, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  <input
+                    placeholder="Header Key"
+                    value={h.key}
+                    onChange={(e) => {
+                      const arr = [...headers];
+                      arr[i].key = e.target.value;
+                      setHeaders(arr);
+                    }}
+                    style={{
+                      padding: 10,
+                      flex: 1,
+                      background: "#1c1c2b",
+                      color: "white",
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                    }}
+                  />
+                  <input
+                    placeholder="Header Value"
+                    value={h.value}
+                    onChange={(e) => {
+                      const arr = [...headers];
+                      arr[i].value = e.target.value;
+                      setHeaders(arr);
+                    }}
+                    style={{
+                      padding: 10,
+                      flex: 1,
+                      background: "#1c1c2b",
+                      color: "white",
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                    }}
+                  />
+                </div>
+              ))}
+              <button
+                onClick={() => addRow(setHeaders, headers)}
+                style={{
+                  padding: "8px 18px",
+                  background: "rgba(139,92,246,0.15)",
+                  borderRadius: 12,
+                  color: "#b794f4",
+                  border: "1px solid rgba(139,92,246,0.3)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                + Add Header
+              </button>
+            </>
           )}
 
-          
+          {/* BODY */}
           {activeTab === "body" && (
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={10}
-             
+              // placeholder='{"name": "Manoj"}'
               style={{
                 width: "90%",
                 padding: 16,
                 borderRadius: 12,
-                background: "rgba(0,0,0,0.25)",
-                border: "1px solid #00ffc855",
-                color: "#cafff5",
+                background: "#1c1c2b",
+                color: "white",
                 fontFamily: "monospace",
+                border: "1px solid rgba(255,255,255,0.15)",
               }}
             />
           )}
         </div>
       </div>
 
- 
+      {/* RIGHT SIDE RESPONSE */}
       <div
         style={{
           width: "40%",
-          padding: 20,
-          borderRadius: 14,
-          background: "rgba(0,0,0,0.35)",
-          border: "1px solid #00ffc822",
-          boxShadow: "0 0 20px #00ffc822",
-          color: "#bfffea",
-          overflow: "auto",
+          padding: 5,
+          borderRadius: 18,
+          background: "rgba(255,255,255,0.07)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          boxShadow: "0 8px 25px rgba(0,0,0,0.5)",
+          whiteSpace: "pre-wrap",
+          overflowY: "auto",
           fontFamily: "monospace",
+          height: "calc(100vh - 80px)",
         }}
       >
-        <h2 style={{ marginBottom: 15, color: "#00ffc8" }}>Response</h2>
+        <h2 style={{ marginBottom: 15, color: "#b794f4" }}>Response</h2>
+
         {loading
-          ? "⏳ Loading..."
+          ? " Loading..."
           : response
           ? JSON.stringify(response, null, 2)
           : "No response yet"}
