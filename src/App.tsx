@@ -79,7 +79,7 @@ export default function PostmanUI() {
     }
 
     try {
-      const res = await invoke("send_request", { payload });
+      const res = await invoke("send_universal" , payload);
       setResponse(res);
     } catch (err) {
       setResponse({ error: String(err) });
