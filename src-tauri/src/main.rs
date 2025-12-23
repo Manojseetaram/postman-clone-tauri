@@ -82,7 +82,7 @@ fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
 
     options.set_keep_alive(Duration::from_secs(5));
 
-    let (mut client, _connection) = Client::new(options, 10);
+    let ( client, _connection) = Client::new(options, 10);
 
     let qos = match payload.qos {
         0 => QoS::AtMostOnce,
@@ -123,39 +123,73 @@ fn mqtt_sn_send(payload: MqttSnPayload) -> Result<String, String> {
     Ok("MQTT-SN packet sent (gateway mode)".into())
 }
 
-/* =========================
-   CoAP
-   ========================= */
 
-use coap::CoAPClient;
+use coap_lite::{CoapRequest, RequestType};
 
 #[derive(Deserialize)]
 struct CoapPayload {
-    url: String,
+    host: String, // "127.0.0.1:5683"
+    path: String, // "sensor/temp"
     body: Option<String>,
 }
 
 #[tauri::command]
 fn coap_get(payload: CoapPayload) -> Result<String, String> {
-    let response = CoAPClient::get(&payload.url)
+    let mut request: CoapRequest<()> = CoapRequest::new();
+    request.set_method(RequestType::Get);
+    request.set_path(&payload.path);
+
+    let packet = request
+        .message
+        .to_bytes()
         .map_err(|e| e.to_string())?;
 
-    Ok(String::from_utf8_lossy(&response.message.payload).to_string())
+    let socket = UdpSocket::bind("0.0.0.0:0")
+        .map_err(|e| e.to_string())?;
+
+    socket
+        .send_to(&packet, &payload.host)
+        .map_err(|e| e.to_string())?;
+
+    let mut buf = [0u8; 1500];
+    let (size, _) = socket
+        .recv_from(&mut buf)
+        .map_err(|e| e.to_string())?;
+
+    Ok(String::from_utf8_lossy(&buf[..size]).to_string())
 }
 
 #[tauri::command]
 fn coap_post(payload: CoapPayload) -> Result<String, String> {
-    let body = payload.body.unwrap_or_default();
+    let mut request: CoapRequest<()> = CoapRequest::new();
+    request.set_method(RequestType::Post);
+    request.set_path(&payload.path);
 
-    let response = CoAPClient::post(&payload.url, body.as_bytes())
+    if let Some(body) = payload.body {
+        request.message.payload = body.into_bytes();
+    }
+
+    let packet = request
+        .message
+        .to_bytes()
         .map_err(|e| e.to_string())?;
 
-    Ok(String::from_utf8_lossy(&response.message.payload).to_string())
+    let socket = UdpSocket::bind("0.0.0.0:0")
+        .map_err(|e| e.to_string())?;
+
+    socket
+        .send_to(&packet, &payload.host)
+        .map_err(|e| e.to_string())?;
+
+    let mut buf = [0u8; 1500];
+    let (size, _) = socket
+        .recv_from(&mut buf)
+        .map_err(|e| e.to_string())?;
+
+    Ok(String::from_utf8_lossy(&buf[..size]).to_string())
 }
 
-/* =========================
-   MAIN
-   ========================= */
+
 
 fn main() {
     tauri::Builder::default()
