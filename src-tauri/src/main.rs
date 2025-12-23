@@ -12,6 +12,34 @@ use std::net::UdpSocket;
    HTTP / HTTPS
    ========================= */
 
+   #[derive(Deserialize)]
+#[serde(tag = "protocol")]
+enum UniversalPayload {
+    HTTP {
+        method: String,
+        url: String,
+        headers: Option<HashMap<String, String>>,
+        body: Option<String>,
+    },
+    MQTT {
+        broker: String,
+        topic: String,
+        qos: u8,
+        message: String,
+    },
+    MQTT_SN {
+        gateway: String,
+        port: u16,
+        data: String,
+    },
+    COAP {
+        method: String,
+        url: String,
+        payload: Option<String>,
+    },
+}
+
+
 #[derive(Deserialize)]
 struct RequestPayload {
     method: String,
