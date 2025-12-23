@@ -217,23 +217,124 @@ fn coap_post(payload: CoapPayload) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&buf[..size]).to_string())
 }
 
+#[tauri::command]
+async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, String> {
+    match payload {
+        UniversalPayload::HTTP { method, url, headers, body } => {
+            let client = reqwest::Client::new();
+            let method = method.parse::<reqwest::Method>().map_err(|e| e.to_string())?;
+            let mut req = client.request(method, url);
+
+            if let Some(h) = headers {
+                for (k, v) in h {
+                    req = req.header(k, v);
+                }
+            }
+            if let Some(b) = body {
+                req = req.body(b);
+            }
+
+            let res = req.send().await.map_err(|e| e.to_string())?;
+            let status = res.status().as_u16();
+            let text = res.text().await.map_err(|e| e.to_string())?;
+
+            Ok(serde_json::json!({
+                "status": status,
+                "body": text
+            }))
+        }
+
+        UniversalPayload::MQTT { broker, topic, qos, message } => {
+    let mut options = MqttOptions::new("tauri-client", broker, 1883);
+    options.set_keep_alive(Duration::from_secs(5));
+
+    let (client, _conn) = Client::new(options, 10);
+
+    let qos = match qos {
+        0 => QoS::AtMostOnce,
+        1 => QoS::AtLeastOnce,
+        _ => QoS::ExactlyOnce,
+    };
+
+    client
+        .publish(topic, qos, false, message)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "status": "MQTT published" }))
+}
+
+
+      UniversalPayload::MQTT_SN { gateway, port, data } => {
+    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+    socket
+        .send_to(data.as_bytes(), format!("{}:{}", gateway, port))
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "status": "MQTT-SN sent" }))
+}
+
+
+       UniversalPayload::COAP { method, url, payload } => {
+    use coap_lite::{CoapRequest, RequestType};
+
+    let mut req: CoapRequest<()> = CoapRequest::new();
+    req.set_method(match method.as_str() {
+        "POST" => RequestType::Post,
+        "PUT" => RequestType::Put,
+        _ => RequestType::Get,
+    });
+
+    // let parts: Vec<&str> = url.replace("coap://", "").split('/').collect();
+    let cleaned_url = url.replace("coap://", "");
+let parts: Vec<&str> = cleaned_url.split('/').collect();
+
+    let host = parts[0];
+    let path = parts[1..].join("/");
+
+    req.set_path(&path);
+
+    if let Some(p) = payload {
+        req.message.payload = p.into_bytes();
+    }
+
+    let packet = req.message.to_bytes().map_err(|e| e.to_string())?;
+
+    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+
+    socket
+        .send_to(&packet, host)
+        .map_err(|e| e.to_string())?;
+
+    let mut buf = [0u8; 1500];
+    let (size, _) = socket
+        .recv_from(&mut buf)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "response": String::from_utf8_lossy(&buf[..size])
+    }))
+}
+
+
+    }
+}
 
 
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            // HTTP
-            send_request,
+        send_universal
+            // send_request,
 
-            // MQTT
-            mqtt_publish,
+        
+            // mqtt_publish,
 
-            // MQTT-SN
-            mqtt_sn_send,
+     
+            // mqtt_sn_send,
 
-            // CoAP
-            coap_get,
-            coap_post
+           
+            // coap_get,
+            // coap_post
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
