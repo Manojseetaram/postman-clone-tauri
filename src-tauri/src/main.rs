@@ -20,11 +20,13 @@ enum UniversalPayload {
         body: Option<String>,
     },
     MQTT {
-        broker: String,
-        topic: String,
-        qos: u8,
-        message: String,
-    },
+    broker: String,
+    port: u16,
+    topic: String,
+    qos: u8,
+    message: String,
+},
+
     MQTT_SN {
         gateway: String,
         port: u16,
@@ -114,7 +116,6 @@ async fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
             let _ = eventloop.eventloop.poll().await;
         }
     });
-    3
 
     let qos = match payload.qos {
         0 => QoS::AtMostOnce,
@@ -247,11 +248,26 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
             }))
         }
 
-     UniversalPayload::MQTT { broker, topic, qos, message } => {
-    let mut options = MqttOptions::new("tauri-client", broker, 1883);
-    options.set_keep_alive(Duration::from_secs(5));
+    UniversalPayload::MQTT { broker, port, topic, qos, message } => {
+    // let mut options = MqttOptions::new("tauri-client", broker, port);
+    let client_id = format!("tauri-{}", uuid::Uuid::new_v4());
 
-    let (mut client, mut connection) = Client::new(options, 10);
+let mut options = MqttOptions::new(client_id, broker, port);
+
+    options.set_keep_alive(Duration::from_secs(10));
+
+    // Client + Connection (NOT EventLoop)
+    let (client, mut connection) = Client::new(options, 10);
+
+    // IMPORTANT: keep MQTT connection alive
+    std::thread::spawn(move || {
+        for notification in connection.iter() {
+            if let Err(e) = notification {
+                eprintln!("MQTT connection error: {:?}", e);
+                break;
+            }
+        }
+    });
 
     let qos = match qos {
         0 => QoS::AtMostOnce,
@@ -263,15 +279,11 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
         .publish(topic, qos, false, message)
         .map_err(|e| e.to_string())?;
 
-    // 🔥 THIS IS THE MISSING PART
-    thread::spawn(move || {
-        for _ in connection.iter().take(1) {}
-    });
-
     Ok(serde_json::json!({
-        "status": "MQTT published (real)"
+        "status": "MQTT published successfully"
     }))
 }
+
 
 
       UniversalPayload::MQTT_SN { gateway, port, data } => {
