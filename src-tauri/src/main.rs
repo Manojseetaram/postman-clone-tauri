@@ -8,9 +8,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use std::net::UdpSocket;
 
-/* =========================
-   HTTP / HTTPS
-   ========================= */
+
 
    #[derive(Deserialize)]
 #[serde(tag = "protocol")]
@@ -85,11 +83,9 @@ async fn send_request(payload: RequestPayload) -> Result<ResponsePayload, String
     Ok(ResponsePayload { status, body: json })
 }
 
-/* =========================
-   MQTT
-   ========================= */
 
-use rumqttc::{Client, MqttOptions, QoS};
+
+use rumqttc::{AsyncClient, MqttOptions, QoS, EventLoop};
 
 #[derive(Deserialize)]
 struct MqttPublishPayload {
@@ -101,7 +97,7 @@ struct MqttPublishPayload {
 }
 
 #[tauri::command]
-fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
+async fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
     let mut options = MqttOptions::new(
         "tauri-mqtt-client",
         payload.broker,
@@ -110,7 +106,14 @@ fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
 
     options.set_keep_alive(Duration::from_secs(5));
 
-    let ( client, _connection) = Client::new(options, 10);
+    let (client, mut eventloop) = AsyncClient::new(options, 10);
+
+    // ✅ Run event loop safely inside async runtime
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let _ = eventloop.poll().await;
+        }
+    });
 
     let qos = match payload.qos {
         0 => QoS::AtMostOnce,
@@ -120,14 +123,13 @@ fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
 
     client
         .publish(payload.topic, qos, false, payload.payload)
+        .await
         .map_err(|e| e.to_string())?;
 
-    Ok("MQTT message published".into())
+    Ok("MQTT message published successfully".into())
 }
 
-/* =========================
-   MQTT-SN (Gateway / UDP)
-   ========================= */
+
 
 #[derive(Deserialize)]
 struct MqttSnPayload {
