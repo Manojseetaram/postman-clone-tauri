@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 use std::net::UdpSocket;
-
+use std::thread;
 
 
    #[derive(Deserialize)]
@@ -85,7 +85,7 @@ async fn send_request(payload: RequestPayload) -> Result<ResponsePayload, String
 
 
 
-use rumqttc::{AsyncClient, MqttOptions, QoS, EventLoop};
+use rumqttc::{Client, MqttOptions, QoS};
 
 #[derive(Deserialize)]
 struct MqttPublishPayload {
@@ -106,14 +106,15 @@ async fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
 
     options.set_keep_alive(Duration::from_secs(5));
 
-    let (client, mut eventloop) = AsyncClient::new(options, 10);
+    let (client, mut eventloop) = Client::new(options, 10);
 
     // ✅ Run event loop safely inside async runtime
     tauri::async_runtime::spawn(async move {
         loop {
-            let _ = eventloop.poll().await;
+            let _ = eventloop.eventloop.poll().await;
         }
     });
+    3
 
     let qos = match payload.qos {
         0 => QoS::AtMostOnce,
@@ -123,7 +124,7 @@ async fn mqtt_publish(payload: MqttPublishPayload) -> Result<String, String> {
 
     client
         .publish(payload.topic, qos, false, payload.payload)
-        .await
+       
         .map_err(|e| e.to_string())?;
 
     Ok("MQTT message published successfully".into())
@@ -246,21 +247,11 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
             }))
         }
 
-       UniversalPayload::MQTT { broker, topic, qos, message } => {
-    use rumqttc::{AsyncClient, MqttOptions, QoS};
-    use std::time::Duration;
-
+     UniversalPayload::MQTT { broker, topic, qos, message } => {
     let mut options = MqttOptions::new("tauri-client", broker, 1883);
     options.set_keep_alive(Duration::from_secs(5));
 
-    let (client, mut eventloop) = AsyncClient::new(options, 10);
-
-   
-    tauri::async_runtime::spawn(async move {
-        loop {
-            let _ = eventloop.poll().await;
-        }
-    });
+    let (mut client, mut connection) = Client::new(options, 10);
 
     let qos = match qos {
         0 => QoS::AtMostOnce,
@@ -270,11 +261,15 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
 
     client
         .publish(topic, qos, false, message)
-        .await
         .map_err(|e| e.to_string())?;
 
+    // 🔥 THIS IS THE MISSING PART
+    thread::spawn(move || {
+        for _ in connection.iter().take(1) {}
+    });
+
     Ok(serde_json::json!({
-        "status": "MQTT published"
+        "status": "MQTT published (real)"
     }))
 }
 
