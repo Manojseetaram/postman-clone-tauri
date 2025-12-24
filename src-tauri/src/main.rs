@@ -246,11 +246,21 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
             }))
         }
 
-        UniversalPayload::MQTT { broker, topic, qos, message } => {
+       UniversalPayload::MQTT { broker, topic, qos, message } => {
+    use rumqttc::{AsyncClient, MqttOptions, QoS};
+    use std::time::Duration;
+
     let mut options = MqttOptions::new("tauri-client", broker, 1883);
     options.set_keep_alive(Duration::from_secs(5));
 
-    let (client, _conn) = Client::new(options, 10);
+    let (client, mut eventloop) = AsyncClient::new(options, 10);
+
+   
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let _ = eventloop.poll().await;
+        }
+    });
 
     let qos = match qos {
         0 => QoS::AtMostOnce,
@@ -260,9 +270,12 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
 
     client
         .publish(topic, qos, false, message)
+        .await
         .map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({ "status": "MQTT published" }))
+    Ok(serde_json::json!({
+        "status": "MQTT published"
+    }))
 }
 
 
