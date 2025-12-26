@@ -33,10 +33,12 @@ enum UniversalPayload {
         data: String,
     },
     COAP {
-        method: String,
-        url: String,
-        payload: Option<String>,
-    },
+    method: String,
+    host: String,   // "localhost:5683"
+    path: String,   // "test"
+    payload: Option<String>,
+},
+
 }
 
 
@@ -224,9 +226,18 @@ fn coap_post(payload: CoapPayload) -> Result<String, String> {
 #[tauri::command]
 async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, String> {
     match payload {
-        UniversalPayload::HTTP { method, url, headers, body } => {
+        // ---------------- HTTP ----------------
+        UniversalPayload::HTTP {
+            method,
+            url,
+            headers,
+            body,
+        } => {
             let client = reqwest::Client::new();
-            let method = method.parse::<reqwest::Method>().map_err(|e| e.to_string())?;
+            let method = method
+                .parse::<reqwest::Method>()
+                .map_err(|e| e.to_string())?;
+
             let mut req = client.request(method, url);
 
             if let Some(h) = headers {
@@ -234,6 +245,7 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
                     req = req.header(k, v);
                 }
             }
+
             if let Some(b) = body {
                 req = req.body(b);
             }
@@ -248,83 +260,90 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
             }))
         }
 
-    UniversalPayload::MQTT { broker, port, topic, qos, message } => {
-    // let mut options = MqttOptions::new("tauri-client", broker, port);
-    let client_id = format!("tauri-{}", uuid::Uuid::new_v4());
+        // ---------------- MQTT ----------------
+        UniversalPayload::MQTT {
+            broker,
+            port,
+            topic,
+            qos,
+            message,
+        } => {
+            let mut options = MqttOptions::new("tauri-client", broker, port);
+            options.set_keep_alive(Duration::from_secs(10));
 
-let mut options = MqttOptions::new(client_id, broker, port);
+            let (client, mut connection) = Client::new(options, 10);
 
-    options.set_keep_alive(Duration::from_secs(10));
+            std::thread::spawn(move || {
+                for notification in connection.iter() {
+                    if let Err(e) = notification {
+                        eprintln!("MQTT connection error: {:?}", e);
+                        break;
+                    }
+                }
+            });
 
-    // Client + Connection (NOT EventLoop)
-    let (client, mut connection) = Client::new(options, 10);
+            let qos = match qos {
+                0 => QoS::AtMostOnce,
+                1 => QoS::AtLeastOnce,
+                _ => QoS::ExactlyOnce,
+            };
 
-    // IMPORTANT: keep MQTT connection alive
-    std::thread::spawn(move || {
-        for notification in connection.iter() {
-            if let Err(e) = notification {
-                eprintln!("MQTT connection error: {:?}", e);
-                break;
-            }
+            client
+                .publish(topic, qos, false, message)
+                .map_err(|e| e.to_string())?;
+
+            Ok(serde_json::json!({
+                "status": "MQTT published successfully"
+            }))
         }
-    });
 
-    let qos = match qos {
-        0 => QoS::AtMostOnce,
-        1 => QoS::AtLeastOnce,
-        _ => QoS::ExactlyOnce,
-    };
+        // ---------------- MQTT-SN ----------------
+        UniversalPayload::MQTT_SN { gateway, port, data } => {
+            let socket =
+                UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
 
-    client
-        .publish(topic, qos, false, message)
-        .map_err(|e| e.to_string())?;
+            socket
+                .send_to(data.as_bytes(), format!("{}:{}", gateway, port))
+                .map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({
-        "status": "MQTT published successfully"
-    }))
-}
+            Ok(serde_json::json!({
+                "status": "MQTT-SN sent"
+            }))
+        }
 
+        // ---------------- COAP ----------------
+UniversalPayload::COAP {
+    method,
+    host,
+    path,
+    payload,
+} => {
+    let mut request: CoapRequest<()> = CoapRequest::new();
 
-
-      UniversalPayload::MQTT_SN { gateway, port, data } => {
-    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
-    socket
-        .send_to(data.as_bytes(), format!("{}:{}", gateway, port))
-        .map_err(|e| e.to_string())?;
-
-    Ok(serde_json::json!({ "status": "MQTT-SN sent" }))
-}
-
-
-       UniversalPayload::COAP { method, url, payload } => {
-    use coap_lite::{CoapRequest, RequestType};
-
-    let mut req: CoapRequest<()> = CoapRequest::new();
-    req.set_method(match method.as_str() {
-        "POST" => RequestType::Post,
-        "PUT" => RequestType::Put,
-        _ => RequestType::Get,
-    });
-
-    // let parts: Vec<&str> = url.replace("coap://", "").split('/').collect();
-    let cleaned_url = url.replace("coap://", "");
-let parts: Vec<&str> = cleaned_url.split('/').collect();
-
-    let host = parts[0];
-    let path = parts[1..].join("/");
-
-    req.set_path(&path);
-
-    if let Some(p) = payload {
-        req.message.payload = p.into_bytes();
+    match method.as_str() {
+        "GET" => request.set_method(RequestType::Get),
+        "POST" => request.set_method(RequestType::Post),
+        _ => return Err("Unsupported CoAP method".into()),
     }
 
-    let packet = req.message.to_bytes().map_err(|e| e.to_string())?;
+    // ✅ correct: set CoAP resource path
+    request.set_path(&path);
 
-    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+    if let Some(p) = payload {
+        request.message.payload = p.into_bytes();
+    }
 
+    let packet = request
+        .message
+        .to_bytes()
+        .map_err(|e| e.to_string())?;
+
+    let socket =
+        UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+
+    // ✅ correct: send only host:port
     socket
-        .send_to(&packet, host)
+        .send_to(&packet, &host)
         .map_err(|e| e.to_string())?;
 
     let mut buf = [0u8; 1500];
@@ -337,10 +356,8 @@ let parts: Vec<&str> = cleaned_url.split('/').collect();
     }))
 }
 
-
     }
 }
-
 
 fn main() {
     tauri::Builder::default()
