@@ -4,10 +4,10 @@
 )]
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, net::ToSocketAddrs};
 use std::time::Duration;
 use std::net::UdpSocket;
-use std::thread;
+
 
 
    #[derive(Deserialize)]
@@ -311,13 +311,12 @@ async fn send_universal(payload: UniversalPayload) -> Result<serde_json::Value, 
             }))
         }
 
-        // ---------------- COAP ----------------
-UniversalPayload::COAP {
-    method,
-    host,
-    path,
-    payload,
-} => {
+
+
+
+
+
+UniversalPayload::COAP { method, host, path, payload } => {
     let mut request: CoapRequest<()> = CoapRequest::new();
 
     match method.as_str() {
@@ -326,7 +325,6 @@ UniversalPayload::COAP {
         _ => return Err("Unsupported CoAP method".into()),
     }
 
-    // ✅ correct: set CoAP resource path
     request.set_path(&path);
 
     if let Some(p) = payload {
@@ -338,23 +336,27 @@ UniversalPayload::COAP {
         .to_bytes()
         .map_err(|e| e.to_string())?;
 
-    let socket =
-        UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
 
-    // ✅ correct: send only host:port
-    socket
-        .send_to(&packet, &host)
-        .map_err(|e| e.to_string())?;
+    // 🔑 Correct: resolve host:port properly
+    let addr = host
+        .to_socket_addrs()
+        .map_err(|e| format!("Invalid host/port: {}", e))?
+        .next()
+        .ok_or("Could not resolve host")?;
+
+    socket.send_to(&packet, addr).map_err(|e| e.to_string())?;
 
     let mut buf = [0u8; 1500];
-    let (size, _) = socket
-        .recv_from(&mut buf)
-        .map_err(|e| e.to_string())?;
+    let (size, _) = socket.recv_from(&mut buf).map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({
         "response": String::from_utf8_lossy(&buf[..size])
     }))
 }
+
+
+
 
     }
 }

@@ -1,24 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+function parseCoapUrl(url: string) {
+  const clean = url.replace(/^coap:\/\//, "");
+  const [hostPort, ...pathParts] = clean.split("/");
+  return { host: hostPort, path: pathParts.join("/") };
+}
+
+
 
 export default function PostmanUI() {
-
   const [protocol, setProtocol] = useState("HTTP");
 
- 
+  // HTTP
   const [method, setMethod] = useState("GET");
   const [url, setUrl] = useState("");
   const [headers, setHeaders] = useState([{ key: "", value: "" }]);
   const [queryParams, setQueryParams] = useState([{ key: "", value: "" }]);
   const [body, setBody] = useState("");
 
-  
+  // MQTT / MQTT-SN
   const [broker, setBroker] = useState("");
+  const [port, setPort] = useState(1883);
   const [topic, setTopic] = useState("");
   const [qos, setQos] = useState(0);
 
-  
+  // COAP
   const [coapMethod, setCoapMethod] = useState("GET");
   const [coapUrl, setCoapUrl] = useState("");
 
@@ -26,116 +33,93 @@ export default function PostmanUI() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("params");
 
+  /* ---------- RESET UI WHEN PROTOCOL CHANGES ---------- */
+  useEffect(() => {
+    setBody("");
+    setResponse(null);
 
+    if (protocol !== "HTTP") {
+      setActiveTab("body");
+      setHeaders([{ key: "", value: "" }]);
+      setQueryParams([{ key: "", value: "" }]);
+    }
+  }, [protocol]);
+
+  /* ---------- SEND ---------- */
   const sendToBackend = async () => {
     setLoading(true);
     setResponse(null);
 
-    let payload: any = { protocol };
-
-
-    if (protocol === "HTTP") {
-      const query = queryParams
-        .filter(q => q.key)
-        .map(q => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value)}`)
-        .join("&");
-
-      const finalUrl = query ? `${url}?${query}` : url;
-
-      const headerObj = Object.fromEntries(
-        headers.filter(h => h.key).map(h => [h.key, h.value])
-      );
-
-      payload = {
-        protocol,
-        method,
-        url: finalUrl,
-        headers: {
-          "Content-Type": "application/json",
-          ...headerObj,
-        },
-        body,
-      };
-    }
-
-  
-    if (protocol === "MQTT" || protocol === "MQTT-SN") {
-      payload = {
-        protocol,
-        broker,
-        topic,
-        qos,
-        message: body,
-      };
-    }
+    let payload: any;
 
     if (protocol === "COAP") {
-      payload = {
-        protocol,
-        method: coapMethod,
-        url: coapUrl,
-        payload: body,
-      };
+  const { host, path } = parseCoapUrl(coapUrl.trim());
+
+  if (!host || !host.includes(":")) {
+    setResponse({ error: "Invalid CoAP URL. Use coap://host:port/path" });
+    setLoading(false);
+    return;
+  }
+
+  payload = {
+    protocol: "COAP",
+    method: coapMethod,
+    host,
+    path: path || "test", // ✅ fallback
+    payload: body || null,
+  };
+}
+
+
+    if (protocol === "MQTT") {
+      payload = { protocol: "MQTT", broker, port, topic, qos, message: body };
     }
 
+    if (protocol === "MQTT-SN") {
+      payload = { protocol: "MQTT-SN", gateway: broker, port, data: body };
+    }
+
+   if (protocol === "COAP") {
+  const { host, path } = parseCoapUrl(coapUrl.trim());
+
+  if (!host || !host.includes(":")) {
+    setResponse({ error: "Invalid CoAP URL. Use coap://host:port/path" });
+    setLoading(false);
+    return;
+  }
+
+  payload = {
+    protocol: "COAP",
+    method: coapMethod,
+    host,
+    path: path || "test", // fallback if user only typed host
+    payload: body || null,
+  };
+}
+
+
+
     try {
-      const res = await invoke("send_universal" , payload);
+      const res = await invoke("send_universal", { payload });
       setResponse(res);
-    } catch (err) {
-      setResponse({ error: String(err) });
+    } catch (e) {
+      setResponse({ error: String(e) });
     }
 
     setLoading(false);
   };
 
-
-  const card = {
-    background: "rgba(255,255,255,0.07)",
-    backdropFilter: "blur(14px)",
-    borderRadius: 18,
-    border: "1px solid rgba(255,255,255,0.15)",
-    boxShadow: "0 10px 35px rgba(0,0,0,0.5)",
-  };
-
-  const input = {
-    padding: "12px 14px",
-    borderRadius: 12,
-    background: "#1c1c2b",
-    border: "1px solid rgba(255,255,255,0.15)",
-    color: "white",
-    fontSize: 14,
-    width: "100%",
-  };
-
-  const tab = (active: boolean) => ({
-    padding: "10px 22px",
-    borderRadius: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-    border: "none",
-    background: active ? "#8b5cf6" : "rgba(255,255,255,0.12)",
-    color: active ? "#fff" : "#d1d1d1",
-  });
-
+  /* ---------- STYLES ---------- */
+  const card = { background: "rgba(255,255,255,0.07)", borderRadius: 18, padding: 20 };
+  const input = { padding: 12, borderRadius: 12, background: "#1c1c2b", color: "white", width: "100%" };
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        padding: 30,
-        display: "flex",
-        gap: 20,
-        background:
-          "linear-gradient(135deg, #0a0a12, #121428, #1a1035, #120f23)",
-        color: "white",
-        fontFamily: "Inter, sans-serif",
-      }}
-    >
-
+    <div style={{ height: "100vh", padding: 30, display: "flex", gap: 20, background: "#0b0b16", color: "white" }}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
-     
-        <div style={{ ...card, padding: 20, display: "flex", gap: 12 }}>
-          <select value={protocol} onChange={(e) => setProtocol(e.target.value)} style={input}>
+        
+        {/* ---------- TOP BAR ---------- */}
+        <div style={{ ...card, display: "flex", gap: 12 }}>
+          <select value={protocol} onChange={e => setProtocol(e.target.value)} style={input}>
             <option>HTTP</option>
             <option>MQTT</option>
             <option>MQTT-SN</option>
@@ -144,35 +128,21 @@ export default function PostmanUI() {
 
           {protocol === "HTTP" && (
             <>
-              <select value={method} onChange={(e) => setMethod(e.target.value)} style={input}>
-                {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
+              <select value={method} onChange={e => setMethod(e.target.value)} style={input}>
+                {["GET","POST","PUT","PATCH","DELETE"].map(m => <option key={m}>{m}</option>)}
               </select>
-              <input
-                placeholder="https://api.example.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                style={input}
-              />
+              <input placeholder="https://api.example.com" value={url} onChange={e => setUrl(e.target.value)} style={input} />
             </>
           )}
 
           {(protocol === "MQTT" || protocol === "MQTT-SN") && (
             <>
-              <input
-                placeholder="mqtt://broker:port"
-                value={broker}
-                onChange={(e) => setBroker(e.target.value)}
-                style={input}
-              />
-              <input
-                placeholder="Topic"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                style={input}
-              />
-              <select value={qos} onChange={(e) => setQos(Number(e.target.value))} style={input}>
+              <input placeholder="Broker (test.mosquitto.org)" value={broker} onChange={e => setBroker(e.target.value)} style={input} />
+              <input type="number" placeholder="1883" value={port} onChange={e => setPort(+e.target.value)} style={input} />
+              {protocol === "MQTT" && (
+                <input placeholder="Topic" value={topic} onChange={e => setTopic(e.target.value)} style={input} />
+              )}
+              <select value={qos} onChange={e => setQos(+e.target.value)} style={input}>
                 <option value={0}>QoS 0</option>
                 <option value={1}>QoS 1</option>
                 <option value={2}>QoS 2</option>
@@ -182,124 +152,41 @@ export default function PostmanUI() {
 
           {protocol === "COAP" && (
             <>
-              <select value={coapMethod} onChange={(e) => setCoapMethod(e.target.value)} style={input}>
-                {["GET", "POST", "PUT", "DELETE"].map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
+              <select value={coapMethod} onChange={e => setCoapMethod(e.target.value)} style={input}>
+                {["GET","POST","PUT","DELETE"].map(m => <option key={m}>{m}</option>)}
               </select>
-              <input
-                placeholder="coap://host:port/resource"
-                value={coapUrl}
-                onChange={(e) => setCoapUrl(e.target.value)}
-                style={input}
-              />
+              <input placeholder="coap://host:port/path" value={coapUrl} onChange={e => setCoapUrl(e.target.value)} style={input} />
             </>
           )}
 
-          <button
-            onClick={sendToBackend}
-            style={{
-              padding: "12px 30px",
-              background: "#ffb300",
-              color: "#000",
-              fontWeight: 800,
-              borderRadius: 14,
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
+          <button onClick={sendToBackend} style={{ padding: "12px 30px", background: "#ffb300", fontWeight: 800 }}>
             {loading ? "Sending…" : "Send"}
           </button>
         </div>
 
-    
-        <div style={{ ...card, padding: 20, flex: 1 }}>
-        
+        {/* ---------- BODY / PARAMS ---------- */}
+        <div style={{ ...card, flex: 1 }}>
           {protocol === "HTTP" && (
-            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-              <button style={tab(activeTab === "params")} onClick={() => setActiveTab("params")}>
-                Params
-              </button>
-              <button style={tab(activeTab === "headers")} onClick={() => setActiveTab("headers")}>
-                Headers
-              </button>
-              <button style={tab(activeTab === "body")} onClick={() => setActiveTab("body")}>
-                Body
-              </button>
+            <div style={{ marginBottom: 10 }}>
+              <button onClick={() => setActiveTab("params")}>Params</button>
+              <button onClick={() => setActiveTab("headers")}>Headers</button>
+              <button onClick={() => setActiveTab("body")}>Body</button>
             </div>
           )}
 
-        
-          {activeTab === "params" &&
-            queryParams.map((p, i) => (
-              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-                <input
-                  placeholder="Key"
-                  value={p.key}
-                  onChange={(e) => {
-                    const c = [...queryParams];
-                    c[i].key = e.target.value;
-                    setQueryParams(c);
-                  }}
-                  style={input}
-                />
-                <input
-                  placeholder="Value"
-                  value={p.value}
-                  onChange={(e) => {
-                    const c = [...queryParams];
-                    c[i].value = e.target.value;
-                    setQueryParams(c);
-                  }}
-                  style={input}
-                />
-              </div>
-            ))}
-
-          {activeTab === "headers" &&
-            headers.map((h, i) => (
-              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-                <input
-                  placeholder="Header"
-                  value={h.key}
-                  onChange={(e) => {
-                    const c = [...headers];
-                    c[i].key = e.target.value;
-                    setHeaders(c);
-                  }}
-                  style={input}
-                />
-                <input
-                  placeholder="Value"
-                  value={h.value}
-                  onChange={(e) => {
-                    const c = [...headers];
-                    c[i].value = e.target.value;
-                    setHeaders(c);
-                  }}
-                  style={input}
-                />
-              </div>
-            ))}
-
-          
-          {activeTab === "body" && (
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="JSON / Payload"
-              style={{ ...input, height: "90%", width : "95%" , fontFamily: "monospace" }}
-            />
-          )}
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            placeholder={protocol.includes("MQTT") ? "MQTT Payload" : "Payload"}
+            style={{ ...input, height: "90%", fontFamily: "monospace" }}
+          />
         </div>
       </div>
 
-   
-      <div style={{ width: "38%", ...card, padding: 20 }}>
-        <h2 style={{ color: "#b794f4" }}>Response</h2>
-        <pre style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>
-          {loading ? "Loading…" : response ? JSON.stringify(response, null, 2) : "No response"}
-        </pre>
+      {/* ---------- RESPONSE ---------- */}
+      <div style={{ width: "35%", ...card }}>
+        <h3>Response</h3>
+        <pre>{response ? JSON.stringify(response, null, 2) : "No response"}</pre>
       </div>
     </div>
   );
