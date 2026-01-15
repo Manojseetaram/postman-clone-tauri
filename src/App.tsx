@@ -78,14 +78,37 @@ export default function PostmanUI() {
       };
     }
 
-    if (protocol === "MQTT-SN") {
-      payload = {
-        protocol: "MQTT-SN",
-        gateway: broker,
-        port,
-        data: body || "",
-      };
-    }
+   if (protocol === "MQTT-SN") {
+  // Validate gateway
+  if (!broker.trim()) {
+    setResponse({ error: "Gateway cannot be empty" });
+    setLoading(false);
+    return;
+  }
+
+  if (!port || port <= 0) {
+    setResponse({ error: "Invalid port number" });
+    setLoading(false);
+    return;
+  }
+
+  let mqttsnData: string;
+  try {
+    mqttsnData = JSON.stringify(JSON.parse(body));
+  } catch {
+    mqttsnData = body || "";
+  }
+
+  payload = {
+    protocol: "Mqttsn", // <-- Must exactly match Rust enum variant
+    gateway: broker.trim(),
+    port,
+    data: mqttsnData
+  };
+
+  console.log("📡 MQTT-SN Payload:", payload);
+}
+
 
     if (protocol === "HTTP") {
       payload = {

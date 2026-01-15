@@ -10,3 +10,10 @@
 
 1. reqwest = { version = "0.11", features = ["json", "blocking", "gzip", "rustls-tls"] }
 
+{
+  "Mqttsn": {
+    "gateway": "127.0.0.1",
+    "port": 1884,
+    "data": "{\"topic\":\"test/topic\",\"message\":\"Hello MQTT-SN\"}"
+  }
+}
