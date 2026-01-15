@@ -17,7 +17,7 @@ pub enum UniversalPayload {
         qos: u8,
         message: String,
     },
-    MQTT_SN {
+    Mqttsn {
         gateway: String,
         port: u16,
         data: String,
